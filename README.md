@@ -1,2 +1,0 @@
-# finderApp
-project
