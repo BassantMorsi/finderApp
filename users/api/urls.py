@@ -20,6 +20,6 @@ urlpatterns = [
    # url(r'^(?P<userName>[\w-]+)/$', UserDetailAPIView.as_view(), name='details'),
    #url(r'^(?P<userName>[\w-]+)/edit/$', UserUpdateAPIView.as_view(), name='update'),
    # url(r'^(?P<userName>[\w-]+)/delete/$', UserDeleteAPIView.as_view(), name='delete'),
-    url(r'^(?P<userName>[\w-]+)/(?P<password>.*)/(?P<email>[\w.@+-]+)/(?P<mobile>[0-9]+)/$', detail, name='signup1'),
+    url(r'^(?P<username>[\w-]+)/(?P<password>.*)/(?P<email>[\w.@+-]+)/(?P<mobile>[0-9]+)/$', detail, name='signup1'),
 
 ]

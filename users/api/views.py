@@ -66,19 +66,41 @@ def login(request):
 """
 
 #post bas ma3mola be get we7sha ya3ny first version
-def detail(request, userName,password,email,mobile):
-    num_results = User.objects.filter(userName=userName).count()
+
+"""
+def detail(request, username, password, email, mobile):
+    num_results = User.objects.filter(userName=username).count()
     if num_results == 0:
         user = User()
-        user.userName = str(userName)
+        user.userName = str(username)
         user.password = str(password)
         user.email = str(email)
         user.mobile = str(mobile)
         user.save()
-        return HttpResponse("{'userName':'"+str(userName)+"','password':'"+str(password)+"','email':'"+str(email)+"','mobile':'"+str(mobile)+"'}")
+        return HttpResponse("{'userName':'"+str(username)+"','password':'"+str(password)+"','email':'"+str(email)+"','mobile':'"+str(mobile)+"'}")
 
     else:
         return HttpResponse("{'status':'already exists'}")
+"""
+
+
+@api_view(['GET']) #deh m3 kelment request t5aleny a3raf asta5dem Response enha return JSON
+def detail(request, username, password, email, mobile):
+    num_results = User.objects.filter(userName=username).count()
+    if num_results == 0:
+        user = User()
+        user.userName = str(username)
+        user.password = str(password)
+        user.email = str(email)
+        user.mobile = str(mobile)
+        user.save()
+        serializer = UserSerializer(user)
+        return Response(serializer.data)
+    else:
+        msg ={
+            'status': 'exists'
+        }
+        return Response(msg)
 
 
 class UserCreateAPIView(CreateAPIView):
