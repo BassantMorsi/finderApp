@@ -6,16 +6,20 @@ from .views import (
     UserDetailAPIView,
     UserDeleteAPIView,
     UserUpdateAPIView,
-    UserCreateAPIView
-
+    UserCreateAPIView,
+    signup,
+    login,
+    detail,
     )
 
 urlpatterns = [
-    url(r'^create/$', UserCreateAPIView.as_view(), name='create'),
-    url(r'^$', UserListAPIView.as_view(), name='list'),
-    url(r'^(?P<userName>[\w-]+)/$', UserDetailAPIView.as_view(), name='details'),
-    url(r'^(?P<userName>[\w-]+)/edit/$', UserUpdateAPIView.as_view(), name='update'),
-    url(r'^(?P<userName>[\w-]+)/delete/$', UserDeleteAPIView.as_view(), name='delete'),
-    url(r'^(?P<userName>[\w-]+)/(?P<password>.*)/(?P<email>[\w.@+-]+)/(?P<mobile>[0-9]+)/$',views.detail,name='signup'),
+    url(r'^signup/$', signup, name='signup'),
+    url(r'^login/$', login, name='login'),
+   # url(r'^create/$', UserCreateAPIView.as_view(), name='create'),
+   #url(r'^$', UserListAPIView.as_view(), name='list'),
+   # url(r'^(?P<userName>[\w-]+)/$', UserDetailAPIView.as_view(), name='details'),
+   #url(r'^(?P<userName>[\w-]+)/edit/$', UserUpdateAPIView.as_view(), name='update'),
+   # url(r'^(?P<userName>[\w-]+)/delete/$', UserDeleteAPIView.as_view(), name='delete'),
+    url(r'^(?P<userName>[\w-]+)/(?P<password>.*)/(?P<email>[\w.@+-]+)/(?P<mobile>[0-9]+)/$', detail, name='signup1'),
 
 ]

@@ -10,4 +10,4 @@ class UserLimitOffsetPagination(LimitOffsetPagination):
 
 
 class UserPageNumberPaginaton(PageNumberPagination):
-    page_size = 2
+    page_size = 100
