@@ -13,7 +13,7 @@ from rest_framework.generics import (
     )
 
 
-from users.models import User
+from users.models import User, FindRequest, MissRequest
 from .pagination import UserLimitOffsetPagination, UserPageNumberPaginaton
 
 from .serializers import (
@@ -21,6 +21,130 @@ from .serializers import (
     UserDetailSerializer,
     UserSerializer,
     )
+
+import os
+import cv2
+from PIL import Image
+import numpy as np
+import base64
+
+FACE_DETECTOR_PATH = "{base_path}/cascades/haarcascade_frontalface_default.xml".format(
+    base_path=os.path.abspath(os.path.dirname(__file__)))
+
+TRAINED_FACES_PATH = "{base_path}/faces/training".format(
+    base_path=os.path.abspath(os.path.dirname(__file__)))
+
+# maximum distance between face and match
+THRESHOLD = 75
+
+# create the cascade classifiers
+detector = cv2.CascadeClassifier(FACE_DETECTOR_PATH)
+
+# path  faces/testing or faces/training
+# imageName == 1...10.userid.userrequest.jpg
+# image extension = .userid.userrequest
+
+
+def get_images_and_labels(path, extension):
+    # images will contains face images
+    images = []
+    # labels will contains the label that is assigned to the image
+    labels = []
+    # Append all the absolute image paths in a list image_paths
+    image_paths = [os.path.join(path, f) for f in os.listdir(path) if f.endswith(extension)]
+    for image_path in image_paths:
+        # Read the image and convert to grayscale
+        image_pil = Image.open(image_path).convert('L')
+        # Convert the image format into numpy array
+        image = np.array(image_pil, 'uint8')
+        # Detect the face in the image
+        faces = detector.detectMultiScale(image)
+        # If face is detected, append the face to images and the label to labels
+        for (x, y, w, h) in faces:
+            images.append(image[y: y + h, x: x + w])
+            # labels.append(int(user_path))
+    return images, labels
+
+#recognizer = cv2.face.createLBPHFaceRecognizer()
+#images, labels = get_images_and_labels(TRAINED_FACES_PATH)
+#recognizer.train(images)
+
+
+@api_view(['POST'])
+def find_request(request):
+    data = request.data
+    username = data.get('userName', None)
+    date = data.get('date', None)
+    strimage1 =data.get('image1', None)
+    strimage2 = data.get('image2', None)
+    strimage3 = data.get('image3', None)
+    strimage4 = data.get('image4', None)
+    strimage5 = data.get('image5', None)
+    strimage6 = data.get('image6', None)
+    strimage7 = data.get('image7', None)
+    strimage8 = data.get('image8', None)
+    strimage9 = data.get('image9', None)
+    strimage10 = data.get('image10', None)
+    listOfImages = [strimage1, strimage2, strimage3, strimage4, strimage5, strimage6,
+                    strimage7, strimage8, strimage9, strimage10]
+
+    user = User.objects.get(userName=username)
+    r = FindRequest(user=user, date=date)
+
+    if FindRequest.objects.filter(user=user, date=date).exists():
+        msg = {
+            'status': 'You have already sent your request...'
+        }
+        return Response(msg, status=status.HTTP_404_NOT_FOUND)
+    else:
+        r.save()
+        abspath = os.getcwd() + "/users/api/faces/training/"
+        os.chdir(os.path.dirname(abspath))
+        userid = str(user.id)
+        requestid = str(r.id)
+        imgNum = 0
+        for x in listOfImages:
+            imgdata = base64.b64decode(x)
+            # imgNum = listOfImages.index(x) + 1
+            imgNum = imgNum + 1
+            # print imgNum
+            filename = str(imgNum) + '.' + requestid + '.' + userid + '.jpg'
+            with open(filename, 'wb') as f:
+                f.write(imgdata)
+
+        msg = {
+            'status': 'Your request has been sent...'
+        }
+        return Response(msg)
+
+
+@api_view(['POST'])
+def miss_request(request):
+    data = request.data
+    username = data.get('userName', None)
+    date = data.get('date', None)
+    strimage =data.get('image1', None)
+    user = User.objects.get(userName=username)
+    r = MissRequest(user=user, date=date)
+    if MissRequest.objects.filter(user=user, date=date).exists():
+        msg = {
+            'status': 'You have already sent your request...'
+        }
+        return Response(msg, status=status.HTTP_404_NOT_FOUND)
+    else:
+        r.save()
+        abspath = os.getcwd() + "/users/api/faces/testing/"
+        os.chdir(os.path.dirname(abspath))
+        userid = str(user.id)
+        requestid = str(r.id)
+        imgdata = base64.b64decode(strimage)
+        filename = 'face'+'.' + requestid + '.' + userid + '.jpg'
+        with open(filename, 'wb') as f:
+            f.write(imgdata)
+        msg = {
+            'status': 'Your request has been sent...'
+        }
+        return Response(msg)
 
 
 @api_view(['GET', 'POST'])
@@ -51,7 +175,7 @@ def login(request):
         password = data.get('password', None)
         user = User.objects.get(userName=username, password=password)
     except User.DoesNotExist:
-        return Response(msg,status=status.HTTP_404_NOT_FOUND)
+        return Response(msg, status=status.HTTP_404_NOT_FOUND)
     serializer = UserSerializer(user)
     return Response(serializer.data)
 
@@ -101,6 +225,13 @@ def detail(request, username, password, email, mobile):
             'status': 'exists'
         }
         return Response(msg)
+
+
+
+
+
+
+
 
 
 class UserCreateAPIView(CreateAPIView):
