@@ -98,7 +98,7 @@ def find_request(request):
         return Response(msg, status=status.HTTP_404_NOT_FOUND)
     else:
         r.save()
-        abspath = os.getcwd() + "/users/api/faces/training/"
+        abspath = os.getcwd()+"/users/api/faces/find/"
         os.chdir(os.path.dirname(abspath))
         userid = str(user.id)
         requestid = str(r.id)
@@ -118,6 +118,56 @@ def find_request(request):
         return Response(msg)
 
 
+@api_view(['POST'])
+def miss_request(request):
+    data = request.data
+    username = data.get('userName', None)
+    date = data.get('date', None)
+    strimage1 =data.get('image1', None)
+    strimage2 = data.get('image2', None)
+    strimage3 = data.get('image3', None)
+    strimage4 = data.get('image4', None)
+    strimage5 = data.get('image5', None)
+    strimage6 = data.get('image6', None)
+    strimage7 = data.get('image7', None)
+    strimage8 = data.get('image8', None)
+    strimage9 = data.get('image9', None)
+    strimage10 = data.get('image10', None)
+    listOfImages = [strimage1, strimage2, strimage3, strimage4, strimage5, strimage6,
+                    strimage7, strimage8, strimage9, strimage10]
+
+    user = User.objects.get(userName=username)
+    r = MissRequest(user=user, date=date)
+
+    if MissRequest.objects.filter(user=user, date=date).exists():
+        msg = {
+            'status': 'You have already sent your request...'
+        }
+        return Response(msg, status=status.HTTP_404_NOT_FOUND)
+    else:
+        r.save()
+        abspath = os.getcwd()+"/users/api/faces/miss/"
+        os.chdir(os.path.dirname(abspath))
+        userid = str(user.id)
+        requestid = str(r.id)
+        imgNum = 0
+        for x in listOfImages:
+            imgdata = base64.b64decode(x)
+            # imgNum = listOfImages.index(x) + 1
+            imgNum = imgNum + 1
+            # print imgNum
+            filename = str(imgNum) + '.' + requestid + '.' + userid + '.jpg'
+            with open(filename, 'wb') as f:
+                f.write(imgdata)
+
+        msg = {
+            'status': 'Your request has been sent...'
+        }
+        return Response(msg)
+
+
+
+"""
 @api_view(['POST'])
 def miss_request(request):
     data = request.data
@@ -145,7 +195,7 @@ def miss_request(request):
             'status': 'Your request has been sent...'
         }
         return Response(msg)
-
+"""
 
 @api_view(['GET', 'POST'])
 def signup(request):
