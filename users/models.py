@@ -20,6 +20,8 @@ class User(models.Model):
 class FindRequest(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     date = models.DateField(null=False)
+    fName = models.CharField(max_length=100)
+    gender = models.CharField(max_length=1)
     status = models.BooleanField(default=False)
 
     class Meta:
@@ -34,6 +36,8 @@ class FindRequest(models.Model):
 class MissRequest(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     date = models.DateField(null=False)
+    fName = models.CharField(max_length=100)
+    gender = models.CharField(max_length=1)
     status = models.BooleanField(default=False)
 
     class Meta:

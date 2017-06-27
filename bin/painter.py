@@ -5,25 +5,27 @@
 #
 # this demo script illustrates pasting into an already displayed
 # photoimage.  note that the current version of Tk updates the whole
-# image everytime we paste, so to get decent performance, we split
+# image every time we paste, so to get decent performance, we split
 # the image into a set of tiles.
 #
 
-try:
-    from tkinter import Tk, Canvas, NW
-except ImportError:
-    from Tkinter import Tk, Canvas, NW
+import sys
+
+if sys.version_info[0] > 2:
+    import tkinter
+else:
+    import Tkinter as tkinter
 
 from PIL import Image, ImageTk
-import sys
 
 #
 # painter widget
 
 
-class PaintCanvas(Canvas):
+class PaintCanvas(tkinter.Canvas):
     def __init__(self, master, image):
-        Canvas.__init__(self, master, width=image.size[0], height=image.size[1])
+        tkinter.Canvas.__init__(self, master,
+                                width=image.size[0], height=image.size[1])
 
         # fill the canvas
         self.tile = {}
@@ -33,7 +35,7 @@ class PaintCanvas(Canvas):
             for y in range(0, ysize, tilesize):
                 box = x, y, min(xsize, x+tilesize), min(ysize, y+tilesize)
                 tile = ImageTk.PhotoImage(image.crop(box))
-                self.create_image(x, y, image=tile, anchor=NW)
+                self.create_image(x, y, image=tile, anchor=tkinter.NW)
                 self.tile[(x, y)] = box, tile
 
         self.image = image
@@ -66,11 +68,11 @@ class PaintCanvas(Canvas):
 #
 # main
 
-root = Tk()
-
 if len(sys.argv) != 2:
     print("Usage: painter file")
     sys.exit(1)
+
+root = tkinter.Tk()
 
 im = Image.open(sys.argv[1])
 

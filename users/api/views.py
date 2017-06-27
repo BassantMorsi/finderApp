@@ -21,7 +21,7 @@ from .serializers import (
     UserDetailSerializer,
     UserSerializer,
     )
-
+from datetime import datetime as dt
 import os
 import cv2
 from PIL import Image
@@ -31,8 +31,13 @@ import base64
 FACE_DETECTOR_PATH = "{base_path}/cascades/haarcascade_frontalface_default.xml".format(
     base_path=os.path.abspath(os.path.dirname(__file__)))
 
-TRAINED_FACES_PATH = "{base_path}/faces/training".format(
+MISS_FACES_PATH = "{base_path}/faces/miss/".format(
     base_path=os.path.abspath(os.path.dirname(__file__)))
+
+
+FIND_FACES_PATH = "{base_path}/faces/find/".format(
+   base_path=os.path.abspath(os.path.dirname(__file__)))
+
 
 # maximum distance between face and match
 THRESHOLD = 75
@@ -43,6 +48,29 @@ detector = cv2.CascadeClassifier(FACE_DETECTOR_PATH)
 # path  faces/testing or faces/training
 # imageName == 1...10.userid.userrequest.jpg
 # image extension = .userid.userrequest
+
+
+def get_images_and_labels_helper(path, extension):
+    images = []
+    labels = []
+    temp = []
+    image_paths = [os.path.join(path, f) for f in os.listdir(path) if not f.endswith(extension)]
+    for image_path in image_paths:
+        requestId = os.path.split(image_path)[1].split(".")[1]
+        if requestId not in temp:
+            temp.append(requestId)
+            # Read the image and convert to grayscale
+            image_pil = Image.open(image_path).convert('L')
+            # Convert the image format into numpy array
+            image = np.array(image_pil, 'uint8')
+            # Detect the face in the image
+            faces = detector.detectMultiScale(image)
+            # If face is detected, append the face to images and the label to labels
+            for (x, y, w, h) in faces:
+                images.append(image[y: y + h, x: x + w])
+                labels.append(int(os.path.split(image_path)[1].split(".")[1]))
+
+    return images, labels
 
 
 def get_images_and_labels(path, extension):
@@ -62,12 +90,132 @@ def get_images_and_labels(path, extension):
         # If face is detected, append the face to images and the label to labels
         for (x, y, w, h) in faces:
             images.append(image[y: y + h, x: x + w])
-            # labels.append(int(user_path))
+            labels.append(int(os.path.split(image_path)[1].split(".")[0]))
     return images, labels
 
-#recognizer = cv2.face.createLBPHFaceRecognizer()
-#images, labels = get_images_and_labels(TRAINED_FACES_PATH)
-#recognizer.train(images)
+"""
+def image_getter(path, extension):
+    images = []
+    image_paths = [os.path.join(path, f) for f in os.listdir(path) if f.endswith(extension)]
+    for image_path in image_paths:
+        image = Image.open(image_path)
+        image = np.array(image, 'uint8')
+        images.append(image)
+
+    return images
+"""
+
+@api_view(['POST'])
+def recognize(request):
+    data = request.data
+    username =data.get('userName', None)
+    date = str(data.get('date', None))
+    requestType = data.get('type', None)
+    user = User.objects.get(userName=username)
+    userid = str(user.id)
+    msg = {
+        'error': 'Sorry there has no any matching yet'
+    }
+
+    if requestType == 'f':
+        r = FindRequest.objects.get(user=user, date=date)
+        fname = r.fName
+        gender = r.gender
+        requestid = str(r.id)
+
+        # print requestid, userid
+        e = '.' + requestid + '.' + userid + '.jpg'
+        images, labels = get_images_and_labels(FIND_FACES_PATH, e)
+        recognizer = cv2.face.createLBPHFaceRecognizer()
+        recognizer.train(images, np.array(labels))
+        e1 = userid + '.jpg'
+        timages, tlabels = get_images_and_labels_helper(MISS_FACES_PATH, e1)
+        collector = cv2.face.StandardCollector_create()
+        recognizer.setThreshold(THRESHOLD)
+        minConf = 1000
+        for timage, tlabel in zip(timages, tlabels):
+            recognizer.predict_collect(timage, collector)
+            conf = collector.getMinDist()
+            # dah bydeny elmin image mismatching ma3 el sora elly batest beha
+            pred = collector.getMinLabel()
+            if conf < minConf:
+                minConf = conf
+                labelRequest = tlabel
+
+            print tlabel
+            print (conf)
+            print (pred)
+        requestconf = MissRequest.objects.get(id=labelRequest)
+        userconf =requestconf.user
+        useridconf = userconf.id
+        print (userconf, useridconf)
+        rdate = str(requestconf.date)
+        rgender = requestconf.gender
+        rstatus = requestconf.status
+        rfname = requestconf.fName
+        print (rdate, rfname, rgender)
+        rdatestr = dt.strptime(rdate, '%Y-%m-%d')
+        datestr = dt.strptime(date, '%Y-%m-%d')
+        print(gender, fname)
+        if rdatestr <= datestr and rgender == gender and rfname == fname and rstatus is False:
+            os.chdir(os.path.dirname(MISS_FACES_PATH))
+            filename = '1.'+str(labelRequest)+'.'+str(useridconf)+'.jpg'
+            image_file = open(filename, 'rb').read()
+            encoded_string = base64.b64encode(image_file)
+            msg = {
+                'image': encoded_string
+            }
+
+    elif requestType == 'm':
+        r = MissRequest.objects.get(user=user, date=date)
+        fname = r.fName
+        gender = r.gender
+        requestid = str(r.id)
+
+        # print requestid, userid
+        e = '.' + requestid + '.' + userid + '.jpg'
+        images, labels = get_images_and_labels(MISS_FACES_PATH, e)
+        recognizer = cv2.face.createLBPHFaceRecognizer()
+        recognizer.train(images, np.array(labels))
+        e1 = userid + '.jpg'
+        timages, tlabels = get_images_and_labels_helper(FIND_FACES_PATH, e1)
+        collector = cv2.face.StandardCollector_create()
+        recognizer.setThreshold(THRESHOLD)
+        minConf = 1000
+        for timage, tlabel in zip(timages, tlabels):
+            recognizer.predict_collect(timage, collector)
+            conf = collector.getMinDist()
+            # dah bydeny elmin image mismatching ma3 el sora elly batest beha
+            pred = collector.getMinLabel()
+            if conf < minConf:
+                minConf = conf
+                labelRequest = tlabel
+
+            print tlabel
+            print (conf)
+            print (pred)
+        requestconf = MissRequest.objects.get(id=labelRequest)
+        userconf = requestconf.user
+        useridconf = userconf.id
+        print (userconf, useridconf)
+        rdate = str(requestconf.date)
+        rgender = requestconf.gender
+        rstatus = requestconf.status
+        rfname = requestconf.fName
+        print (rdate, rfname, rgender)
+        rdatestr = dt.strptime(rdate, '%Y-%m-%d')
+        datestr = dt.strptime(date, '%Y-%m-%d')
+        print(gender, fname)
+        if rdatestr >= datestr and rgender == gender and rfname == fname and rstatus is False:
+            os.chdir(os.path.dirname(FIND_FACES_PATH))
+            filename = '1.' + str(labelRequest) + '.' + str(useridconf) + '.jpg'
+            image_file = open(filename, 'rb').read()
+            encoded_string = base64.b64encode(image_file)
+            msg = {
+                'image': encoded_string
+            }
+
+    return Response(msg)
 
 
 @api_view(['POST'])
@@ -89,7 +237,6 @@ def find_request(request):
                     strimage7, strimage8, strimage9, strimage10]
 
     user = User.objects.get(userName=username)
-    r = FindRequest(user=user, date=date)
 
     if FindRequest.objects.filter(user=user, date=date).exists():
         msg = {
@@ -97,9 +244,16 @@ def find_request(request):
         }
         return Response(msg, status=status.HTTP_404_NOT_FOUND)
     else:
+        # create request object
+        r = FindRequest(user=user, date=date)
         r.save()
-        abspath = os.getcwd()+"/users/api/faces/find/"
-        os.chdir(os.path.dirname(abspath))
+        """print FIND_FACES_PATH
+        abspath = os.getcwd() + "/users/api/faces/find/"
+        print abspath
+        """
+        # abspath = os.getcwd()+"/users/api/faces/find/"
+        # os.chdir(os.path.dirname(abspath))
+        os.chdir(os.path.dirname(FIND_FACES_PATH))
         userid = str(user.id)
         requestid = str(r.id)
         imgNum = 0
@@ -137,17 +291,17 @@ def miss_request(request):
                     strimage7, strimage8, strimage9, strimage10]
 
     user = User.objects.get(userName=username)
-    r = MissRequest(user=user, date=date)
-
     if MissRequest.objects.filter(user=user, date=date).exists():
         msg = {
             'status': 'You have already sent your request...'
         }
         return Response(msg, status=status.HTTP_404_NOT_FOUND)
     else:
+        r = MissRequest(user=user, date=date)
         r.save()
-        abspath = os.getcwd()+"/users/api/faces/miss/"
-        os.chdir(os.path.dirname(abspath))
+        # abspath = os.getcwd()+"/users/api/faces/miss/"
+        # os.chdir(os.path.dirname(abspath))
+        os.chdir(os.path.dirname(MISS_FACES_PATH))
         userid = str(user.id)
         requestid = str(r.id)
         imgNum = 0

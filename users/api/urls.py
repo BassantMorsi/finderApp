@@ -12,6 +12,7 @@ from .views import (
     detail,
     find_request,
     miss_request,
+    recognize,
     )
 
 urlpatterns = [
@@ -25,5 +26,5 @@ urlpatterns = [
    #url(r'^(?P<userName>[\w-]+)/edit/$', UserUpdateAPIView.as_view(), name='update'),
    # url(r'^(?P<userName>[\w-]+)/delete/$', UserDeleteAPIView.as_view(), name='delete'),
     url(r'^(?P<username>[\w-]+)/(?P<password>.*)/(?P<email>[\w.@+-]+)/(?P<mobile>[0-9]+)/$', detail, name='signup1'),
-   # url(r'^recognize/$', recognize, name='recognize'),
+   url(r'^recognize/$', recognize, name='recognize'),
 ]
