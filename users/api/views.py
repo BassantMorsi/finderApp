@@ -20,6 +20,8 @@ from .serializers import (
     UserListSerializer,
     UserDetailSerializer,
     UserSerializer,
+    UserMissRequestSerializer,
+    UserFindRequestSerializer,
     )
 from datetime import datetime as dt
 import os
@@ -50,14 +52,19 @@ detector = cv2.CascadeClassifier(FACE_DETECTOR_PATH)
 # image extension = .userid.userrequest
 
 
-def get_images_and_labels_helper(path, extension):
+def get_images_and_labels_helper(path, extension, stop):
     images = []
     labels = []
     temp = []
+    maxreqid = 0
     image_paths = [os.path.join(path, f) for f in os.listdir(path) if not f.endswith(extension)]
     for image_path in image_paths:
         requestId = os.path.split(image_path)[1].split(".")[1]
-        if requestId not in temp:
+        print('request id:'+requestId)
+        print ('stop:'+str(stop))
+        if requestId not in temp and requestId > str(stop):
+            if requestId > maxreqid:
+                maxreqid = requestId
             temp.append(requestId)
             # Read the image and convert to grayscale
             image_pil = Image.open(image_path).convert('L')
@@ -70,7 +77,7 @@ def get_images_and_labels_helper(path, extension):
                 images.append(image[y: y + h, x: x + w])
                 labels.append(int(os.path.split(image_path)[1].split(".")[1]))
 
-    return images, labels
+    return images, labels, maxreqid
 
 
 def get_images_and_labels(path, extension):
@@ -93,17 +100,6 @@ def get_images_and_labels(path, extension):
             labels.append(int(os.path.split(image_path)[1].split(".")[0]))
     return images, labels
 
-"""
-def image_getter(path, extension):
-    images = []
-    image_paths = [os.path.join(path, f) for f in os.listdir(path) if f.endswith(extension)]
-    for image_path in image_paths:
-        image = Image.open(image_path)
-        image = np.array(image, 'uint8')
-        images.append(image)
-
-    return images
-"""
 
 @api_view(['POST'])
 def recognize(request):
@@ -122,14 +118,15 @@ def recognize(request):
         fname = r.fName
         gender = r.gender
         requestid = str(r.id)
-
-        # print requestid, userid
+        stop = r.stop
+        print requestid, userid
         e = '.' + requestid + '.' + userid + '.jpg'
         images, labels = get_images_and_labels(FIND_FACES_PATH, e)
         recognizer = cv2.face.createLBPHFaceRecognizer()
         recognizer.train(images, np.array(labels))
         e1 = userid + '.jpg'
-        timages, tlabels = get_images_and_labels_helper(MISS_FACES_PATH, e1)
+        timages, tlabels, maxreqid = get_images_and_labels_helper(MISS_FACES_PATH, e1, stop)
+        FindRequest.objects.filter(user=user, date=date).update(stop=maxreqid)
         collector = cv2.face.StandardCollector_create()
         recognizer.setThreshold(THRESHOLD)
         minConf = 1000
@@ -145,40 +142,52 @@ def recognize(request):
             print tlabel
             print (conf)
             print (pred)
-        requestconf = MissRequest.objects.get(id=labelRequest)
-        userconf =requestconf.user
-        useridconf = userconf.id
-        print (userconf, useridconf)
-        rdate = str(requestconf.date)
-        rgender = requestconf.gender
-        rstatus = requestconf.status
-        rfname = requestconf.fName
-        print (rdate, rfname, rgender)
-        rdatestr = dt.strptime(rdate, '%Y-%m-%d')
-        datestr = dt.strptime(date, '%Y-%m-%d')
-        print(gender, fname)
-        if rdatestr <= datestr and rgender == gender and rfname == fname and rstatus is False:
-            os.chdir(os.path.dirname(MISS_FACES_PATH))
-            filename = '1.'+str(labelRequest)+'.'+str(useridconf)+'.jpg'
-            image_file = open(filename, 'rb').read()
-            encoded_string = base64.b64encode(image_file)
-            msg = {
-                'image': encoded_string
-            }
+        print ('hhhhhhhhhhhhhh '+str(len(timages)))
+        if len(timages) > 0:
+            requestconf = MissRequest.objects.get(id=labelRequest)
+            userconf =requestconf.user
+            # user data to be sent that match find request
+            userNameConf = userconf.userName
+            userMobileConf = userconf.mobile
+            userEmailConf = userconf.email
+            # end of user data that i want to send
+            useridconf = userconf.id
+            print (userconf, useridconf)
+            rdate = str(requestconf.date)
+            rgender = requestconf.gender
+            rstatus = requestconf.status
+            rfname = requestconf.fName
+            print (rdate, rfname, rgender)
+            rdatestr = dt.strptime(rdate, '%Y-%m-%d')
+            datestr = dt.strptime(date, '%Y-%m-%d')
+            print(gender, fname)
+            if rdatestr <= datestr and rgender == gender and rfname == fname and rstatus is False:
+                os.chdir(os.path.dirname(MISS_FACES_PATH))
+                filename = '1.'+str(labelRequest)+'.'+str(useridconf)+'.jpg'
+                image_file = open(filename, 'rb').read()
+                encoded_string = base64.b64encode(image_file)
+                msg = {
+                    'image': encoded_string,
+                    'user_name': userNameConf,
+                    'user_mobile': userMobileConf,
+                    'user_email': userEmailConf,
+                    'date': rdate
+                }
 
     elif requestType == 'm':
         r = MissRequest.objects.get(user=user, date=date)
         fname = r.fName
         gender = r.gender
         requestid = str(r.id)
-
+        stop = r.stop
         # print requestid, userid
         e = '.' + requestid + '.' + userid + '.jpg'
         images, labels = get_images_and_labels(MISS_FACES_PATH, e)
         recognizer = cv2.face.createLBPHFaceRecognizer()
         recognizer.train(images, np.array(labels))
         e1 = userid + '.jpg'
-        timages, tlabels = get_images_and_labels_helper(FIND_FACES_PATH, e1)
+        timages, tlabels, maxreqid = get_images_and_labels_helper(FIND_FACES_PATH, e1, stop)
+        MissRequest.objects.filter(user=user, date=date).update(stop=maxreqid)
         collector = cv2.face.StandardCollector_create()
         recognizer.setThreshold(THRESHOLD)
         minConf = 1000
@@ -194,27 +203,61 @@ def recognize(request):
             print tlabel
             print (conf)
             print (pred)
-        requestconf = MissRequest.objects.get(id=labelRequest)
-        userconf = requestconf.user
-        useridconf = userconf.id
-        print (userconf, useridconf)
-        rdate = str(requestconf.date)
-        rgender = requestconf.gender
-        rstatus = requestconf.status
-        rfname = requestconf.fName
-        print (rdate, rfname, rgender)
-        rdatestr = dt.strptime(rdate, '%Y-%m-%d')
-        datestr = dt.strptime(date, '%Y-%m-%d')
-        print(gender, fname)
-        if rdatestr >= datestr and rgender == gender and rfname == fname and rstatus is False:
-            os.chdir(os.path.dirname(FIND_FACES_PATH))
-            filename = '1.' + str(labelRequest) + '.' + str(useridconf) + '.jpg'
-            image_file = open(filename, 'rb').read()
-            encoded_string = base64.b64encode(image_file)
-            msg = {
-                'image': encoded_string
-            }
 
+        if len(timages) > 0:
+            requestconf = MissRequest.objects.get(id=labelRequest)
+            userconf = requestconf.user
+            # user data to be sent that match find request
+            userNameConf = userconf.userName
+            userMobileConf = userconf.mobile
+            userEmailConf = userconf.email
+            # end of user data that i want to send
+            useridconf = userconf.id
+            print (userconf, useridconf)
+            rdate = str(requestconf.date)
+            rgender = requestconf.gender
+            rstatus = requestconf.status
+            rfname = requestconf.fName
+            print (rdate, rfname, rgender)
+            rdatestr = dt.strptime(rdate, '%Y-%m-%d')
+            datestr = dt.strptime(date, '%Y-%m-%d')
+            print(gender, fname)
+            if rdatestr >= datestr and rgender == gender and rfname == fname and rstatus is False:
+                os.chdir(os.path.dirname(FIND_FACES_PATH))
+                filename = '1.' + str(labelRequest) + '.' + str(useridconf) + '.jpg'
+                image_file = open(filename, 'rb').read()
+                encoded_string = base64.b64encode(image_file)
+                msg = {
+                    'image': encoded_string,
+                    'user_name': userNameConf,
+                    'user_mobile': userMobileConf,
+                    'user_email': userEmailConf,
+                    'date': rdate
+                }
+
+    return Response(msg)
+
+
+@api_view(['POST'])
+def request_status(request):
+    data = request.data
+    usernamef = data.get('userNamef', None)
+    datef = data.get('datef', None)
+    usernamem = data.get('userNamem', None)
+    datem = data.get('datem', None)
+
+    userf = User.objects.get(userName=usernamef)
+    r = FindRequest.objects.get(user=userf, date=datef)
+    r.status = True
+    r.save()
+    userm = User.objects.get(userName=usernamem)
+    r1 = MissRequest.objects.get(user=userm, date=datem)
+    r1.status = True
+    r1.save()
+
+    msg = {
+        'status': 'Done'
+    }
     return Response(msg)
 
 
@@ -320,37 +363,6 @@ def miss_request(request):
         return Response(msg)
 
 
-
-"""
-@api_view(['POST'])
-def miss_request(request):
-    data = request.data
-    username = data.get('userName', None)
-    date = data.get('date', None)
-    strimage =data.get('image1', None)
-    user = User.objects.get(userName=username)
-    r = MissRequest(user=user, date=date)
-    if MissRequest.objects.filter(user=user, date=date).exists():
-        msg = {
-            'status': 'You have already sent your request...'
-        }
-        return Response(msg, status=status.HTTP_404_NOT_FOUND)
-    else:
-        r.save()
-        abspath = os.getcwd() + "/users/api/faces/testing/"
-        os.chdir(os.path.dirname(abspath))
-        userid = str(user.id)
-        requestid = str(r.id)
-        imgdata = base64.b64decode(strimage)
-        filename = 'face'+'.' + requestid + '.' + userid + '.jpg'
-        with open(filename, 'wb') as f:
-            f.write(imgdata)
-        msg = {
-            'status': 'Your request has been sent...'
-        }
-        return Response(msg)
-"""
-
 @api_view(['GET', 'POST'])
 def signup(request):
     if request.method == 'GET':
@@ -382,6 +394,18 @@ def login(request):
         return Response(msg, status=status.HTTP_404_NOT_FOUND)
     serializer = UserSerializer(user)
     return Response(serializer.data)
+
+
+@api_view(['GET'])
+def user_requests(request, username):
+    user = User.objects.get(userName=username)
+    user_miss_requests = MissRequest.objects.filter(user=user)
+    user_find_requests = FindRequest.objects.filter(user=user)
+    miss_serializer = UserMissRequestSerializer(user_miss_requests, many=True)
+    find_serializer = UserFindRequestSerializer(user_find_requests, many=True)
+
+    return Response(find_serializer.data+miss_serializer.data,  status=status.HTTP_201_CREATED)
+
 
 # serializer = UserLoginSerializer(data=request.data)
 # serializer = UserSerializer(data=json.loads(request.body.decode('utf-8')))

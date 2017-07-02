@@ -1,7 +1,7 @@
 from __future__ import unicode_literals
 
 from django.db import models
-
+from django.core.validators import MaxValueValidator
 
 # Create your models here.
 
@@ -23,6 +23,8 @@ class FindRequest(models.Model):
     fName = models.CharField(max_length=100)
     gender = models.CharField(max_length=1)
     status = models.BooleanField(default=False)
+    stop = models.PositiveIntegerField(validators=[MaxValueValidator(9999999999)], default=0)
+    type = models.CharField(max_length=1, default='f')
 
     class Meta:
         unique_together = (('user', 'date'),)
@@ -39,6 +41,8 @@ class MissRequest(models.Model):
     fName = models.CharField(max_length=100)
     gender = models.CharField(max_length=1)
     status = models.BooleanField(default=False)
+    stop = models.PositiveIntegerField(validators=[MaxValueValidator(9999999999)], default=0)
+    type = models.CharField(max_length=1, default='m')
 
     class Meta:
         unique_together = (('user', 'date'),)
